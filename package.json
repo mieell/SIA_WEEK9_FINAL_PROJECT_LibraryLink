@@ -1,0 +1,21 @@
+{
+  "name": "librarylink",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integrated library catalog, borrowing, and notification services.",
+  "scripts": {
+    "start:catalog": "node catalog-service/server.js",
+    "start:borrowing": "node borrowing-service/server.js",
+    "start:consumer": "node notification-consumer/consumer.js",
+    "start": "concurrently \"npm run start:catalog\" \"npm run start:borrowing\" \"npm run start:consumer\"",
+    "test:integration": "node scripts/integration-test.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.8",
+    "better-sqlite3": "^12.8.0",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
