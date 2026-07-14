@@ -1,0 +1,133 @@
+{
+  "info": { "name": "LibraryLink Final Project", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "variable": [
+    { "key": "catalogUrl", "value": "http://localhost:3001" },
+    { "key": "borrowingUrl", "value": "http://localhost:3002" },
+    { "key": "jwt", "value": "PASTE_LOGIN_TOKEN_HERE" },
+    { "key": "bookVersion", "value": "1" },
+    { "key": "reservationId", "value": "1" },
+    { "key": "newBookId", "value": "4" }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login - Get JWT (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('jwt', pm.response.json().token);", "pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has token', () => pm.expect(pm.response.json().token).to.be.a('string'));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"username\": \"librarian\",\n  \"password\": \"LibraryLinkDemo2026\"\n}" }, "url": "{{borrowingUrl}}/auth/login" }
+        },
+        {
+          "name": "FAIL - Login Bad Credentials (401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"username\": \"wrong\",\n  \"password\": \"wrong\"\n}" }, "url": "{{borrowingUrl}}/auth/login" }
+        }
+      ]
+    },
+    {
+      "name": "2. Catalog Service (Books)",
+      "item": [
+        {
+          "name": "GET /books - Public List (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"] }}],
+          "request": { "method": "GET", "url": "{{catalogUrl}}/books" }
+        },
+        {
+          "name": "GET /books/:id - Single Book (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has title', () => pm.expect(pm.response.json().title).to.be.a('string'));"] }}],
+          "request": { "method": "GET", "url": "{{catalogUrl}}/books/1" }
+        },
+        {
+          "name": "FAIL - GET /books/:id Not Found (404)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 404', () => pm.response.to.have.status(404));"] }}],
+          "request": { "method": "GET", "url": "{{catalogUrl}}/books/9999" }
+        },
+        {
+          "name": "POST /books - Add Book (201)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('newBookId', pm.response.json().id);", "pm.collectionVariables.set('bookVersion', pm.response.json().version);"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Design Patterns\",\n  \"author\": \"Gang of Four\",\n  \"totalCopies\": 2\n}" }, "url": "{{catalogUrl}}/books" }
+        },
+        {
+          "name": "FAIL - POST /books No Auth (401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Unauthorized Book\",\n  \"author\": \"Nobody\",\n  \"totalCopies\": 1\n}" }, "url": "{{catalogUrl}}/books" }
+        },
+        {
+          "name": "FAIL - POST /books Bad Input (400)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"\",\n  \"author\": \"\"\n}" }, "url": "{{catalogUrl}}/books" }
+        },
+        {
+          "name": "PUT /books/:id - Update Book (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('bookVersion', pm.response.json().version);"] }}],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Design Patterns (2nd Ed.)\",\n  \"author\": \"Gang of Four\",\n  \"totalCopies\": 3,\n  \"expectedVersion\": {{bookVersion}}\n}" }, "url": "{{catalogUrl}}/books/{{newBookId}}" }
+        },
+        {
+          "name": "FAIL - PUT /books Stale Version (409 Conflict)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 409', () => pm.response.to.have.status(409));"] }}],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Stale Update\",\n  \"author\": \"Should Fail\",\n  \"totalCopies\": 1,\n  \"expectedVersion\": 1\n}" }, "url": "{{catalogUrl}}/books/{{newBookId}}" }
+        },
+        {
+          "name": "DELETE /books/:id - Delete Book (204)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 204', () => pm.response.to.have.status(204));"] }}],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{catalogUrl}}/books/{{newBookId}}" }
+        }
+      ]
+    },
+    {
+      "name": "3. Borrowing Service (Reservations)",
+      "item": [
+        {
+          "name": "FAIL - POST /reservations No Auth (401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"borrowerName\": \"Test User\",\n  \"borrowerEmail\": \"test@example.com\",\n  \"bookId\": 1\n}" }, "url": "{{borrowingUrl}}/reservations" }
+        },
+        {
+          "name": "POST /reservations - Create (201 + RabbitMQ)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('reservationId', pm.response.json().reservation.id);"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"borrowerName\": \"Kristine Dela Cruz\",\n  \"borrowerEmail\": \"kristine@ntc.edu\",\n  \"bookId\": 1\n}" }, "url": "{{borrowingUrl}}/reservations" }
+        },
+        {
+          "name": "FAIL - POST /reservations Bad Input (400)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"borrowerName\": \"\",\n  \"borrowerEmail\": \"not-an-email\",\n  \"bookId\": \"abc\"\n}" }, "url": "{{borrowingUrl}}/reservations" }
+        },
+        {
+          "name": "GET /reservations - List All (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }}],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations" }
+        },
+        {
+          "name": "GET /reservations/:id - Single (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }}],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations/{{reservationId}}" }
+        },
+        {
+          "name": "FAIL - Simulated Catalog Outage (503)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 503', () => pm.response.to.have.status(503));"] }}],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-simulate-downstream-failure", "value": "true" }], "body": { "mode": "raw", "raw": "{\n  \"borrowerName\": \"Failure Demo\",\n  \"borrowerEmail\": \"failure@example.com\",\n  \"bookId\": 1\n}" }, "url": "{{borrowingUrl}}/reservations" }
+        },
+        {
+          "name": "PUT /reservations/:id/cancel - Cancel (200)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }}],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations/{{reservationId}}/cancel" }
+        },
+        {
+          "name": "FAIL - Cancel Already Cancelled (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 409', () => pm.response.to.have.status(409));"] }}],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations/{{reservationId}}/cancel" }
+        },
+        {
+          "name": "DELETE /reservations/:id - Delete (204)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 204', () => pm.response.to.have.status(204));"] }}],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations/{{reservationId}}" }
+        },
+        {
+          "name": "FAIL - Delete Active Reservation (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 409', () => pm.response.to.have.status(409));"] }}],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": "{{borrowingUrl}}/reservations/1" }
+        }
+      ]
+    }
+  ]
+}
